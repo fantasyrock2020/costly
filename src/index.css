@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  /* Brand colors matching Horizon UI */
+  --color-brand-50: #f4f7fe;
+  --color-brand-100: #e0e8ff;
+  --color-brand-500: #4318ff;
+  --color-brand-600: #3311db;
+  --color-brand-700: #2b0bbf;
+  --color-brand-dark-500: #7551ff;
+
+  --color-navy-50: #eceff8;
+  --color-navy-100: #d1d9e9;
+  --color-navy-700: #1b254b;
+  --color-navy-800: #111c44;
+  --color-navy-900: #0b1437;
+  --color-navy-950: #080f26;
+  
+  --color-income: #05cd99;
+  --color-expense: #ee5d50;
+  --color-income-dark: #01b574;
+  --color-expense-dark: #e31a1a;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom Scrollbar for premium feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+/* Interactive card transitions */
+.horizon-card-hover {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.horizon-card-hover:hover {
+  transform: translateY(-4px);
+}
