@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Search, Calendar, ListFilter, Plus } from "lucide-react";
 import type { Transaction } from "../types";
 import { t } from "../utils/translations";
+import { formatCurrency } from "../utils/currency";
 import { getPreviousMonth, getTodayISO } from "../utils/date";
 import { transactionService } from "../services/transactionService";
 import TransactionList from "../components/transactions/TransactionList";
@@ -100,6 +101,30 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
     customStartDate,
     customEndDate
   ]);
+
+  // Summary statistics for the filtered transactions
+  const filteredSummary = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+
+    filteredTransactions.forEach((tx) => {
+      if (tx.type === "income") {
+        income += tx.amount;
+      } else {
+        expense += tx.amount;
+      }
+    });
+
+    const net = income - expense;
+    const count = filteredTransactions.length;
+
+    return {
+      income,
+      expense,
+      net,
+      count
+    };
+  }, [filteredTransactions]);
 
   return (
     <div className="space-y-6 pb-24 md:pb-8">
@@ -219,6 +244,71 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
             </div>
           </div>
         )}
+
+        {/* Compact Filter Summary Bar */}
+        <div className="pt-3 border-t border-slate-100 dark:border-navy-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 dark:text-slate-500">
+            <span>Kết quả:</span>
+            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-navy-900 font-bold text-slate-700 dark:text-slate-300">
+              {filteredSummary.count} giao dịch
+            </span>
+          </div>
+
+          <div className="flex items-center flex-wrap gap-x-4 gap-y-1.5 text-xs font-bold">
+            {filterType === "all" ? (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-income shrink-0" />
+                  <span className="text-slate-400 dark:text-slate-500 font-normal">Thu:</span>
+                  <span className="text-income font-extrabold select-all">+{formatCurrency(filteredSummary.income)}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-expense shrink-0" />
+                  <span className="text-slate-400 dark:text-slate-500 font-normal">Chi:</span>
+                  <span className="text-expense font-extrabold select-all">-{formatCurrency(filteredSummary.expense)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 sm:pl-2 sm:border-l border-slate-200 dark:border-navy-700">
+                  <span className="text-slate-400 dark:text-slate-500 font-normal">Chênh lệch:</span>
+                  <span className={`font-extrabold select-all ${
+                    filteredSummary.net > 0 
+                      ? "text-income" 
+                      : filteredSummary.net < 0 
+                      ? "text-expense" 
+                      : "text-slate-700 dark:text-slate-300"
+                  }`}>
+                    {filteredSummary.net > 0 ? "+" : ""}{formatCurrency(filteredSummary.net)}
+                  </span>
+                </div>
+              </>
+            ) : filterType === "income" ? (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-income shrink-0" />
+                  <span className="text-slate-400 dark:text-slate-500 font-normal">Tổng thu:</span>
+                  <span className="text-income text-sm font-black select-all">+{formatCurrency(filteredSummary.income)}</span>
+                </div>
+                {filteredSummary.count > 0 && (
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">
+                    (TB: <strong className="text-income font-semibold">+{formatCurrency(Math.round(filteredSummary.income / filteredSummary.count))}</strong>/GD)
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-expense shrink-0" />
+                  <span className="text-slate-400 dark:text-slate-500 font-normal">Tổng chi:</span>
+                  <span className="text-expense text-sm font-black select-all">-{formatCurrency(filteredSummary.expense)}</span>
+                </div>
+                {filteredSummary.count > 0 && (
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">
+                    (TB: <strong className="text-expense font-semibold">-{formatCurrency(Math.round(filteredSummary.expense / filteredSummary.count))}</strong>/GD)
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </Card>
 
       {/* Grouped transaction history timeline */}

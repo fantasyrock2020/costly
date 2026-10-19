@@ -55,15 +55,33 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
   return (
     <div className="space-y-6">
-      {groupedTransactions.map((group) => (
-        <div key={group.date} className="space-y-3">
-          {/* Group Header (Date) */}
-          <div className="flex items-center gap-2 px-1">
-            <span className="text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              {formatGroupDate(group.date)}
-            </span>
-            <div className="flex-1 h-[1px] bg-slate-100 dark:bg-navy-800/80" />
-          </div>
+      {groupedTransactions.map((group) => {
+        const dayIncome = group.items
+          .filter((tx) => tx.type === "income")
+          .reduce((sum, tx) => sum + tx.amount, 0);
+        const dayExpense = group.items
+          .filter((tx) => tx.type === "expense")
+          .reduce((sum, tx) => sum + tx.amount, 0);
+
+        return (
+          <div key={group.date} className="space-y-3">
+            {/* Group Header (Date & Daily Totals) */}
+            <div className="flex items-center justify-between gap-2 px-1">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate">
+                  {formatGroupDate(group.date)}
+                </span>
+                <div className="flex-1 h-[1px] bg-slate-100 dark:bg-navy-800/80" />
+              </div>
+              <div className="flex items-center gap-2 text-xs font-bold shrink-0">
+                {dayIncome > 0 && (
+                  <span className="text-income">+{formatCurrency(dayIncome)}</span>
+                )}
+                {dayExpense > 0 && (
+                  <span className="text-expense">-{formatCurrency(dayExpense)}</span>
+                )}
+              </div>
+            </div>
 
           {/* Group Items */}
           <div className="space-y-2.5">
@@ -127,9 +145,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 </div>
               );
             })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
