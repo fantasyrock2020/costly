@@ -2,19 +2,25 @@ import React, { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { t } from "../../utils/translations";
 import { formatMonthYear } from "../../utils/date";
+import { SyncStatusBadge } from "../sync/SyncStatusBadge";
+import { UserProfileMenu } from "../auth/UserProfileMenu";
 
 interface HeaderProps {
   selectedYear: number;
   selectedMonth: number;
   onMonthChange: (year: number, month: number) => void;
   title: string;
+  onNavigateToSettings?: () => void;
+  onOpenAuthModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   selectedYear,
   selectedMonth,
   onMonthChange,
-  title
+  title,
+  onNavigateToSettings,
+  onOpenAuthModal
 }) => {
   const [greeting, setGreeting] = useState(t.dashboard.greetingMorning);
 
@@ -59,7 +65,10 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Center Month Selector & Theme Toggle */}
-      <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+      <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
+        <SyncStatusBadge onOpenSettings={onNavigateToSettings} />
+        {onOpenAuthModal && <UserProfileMenu onOpenAuthModal={onOpenAuthModal} />}
+
         {/* Month Selector Card */}
         <div className="flex items-center gap-1.5 bg-white dark:bg-navy-800 border border-slate-100 dark:border-navy-700/80 px-2 py-1.5 rounded-2xl shadow-sm">
           <button

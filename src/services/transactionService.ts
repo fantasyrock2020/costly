@@ -1,4 +1,6 @@
 import type { Transaction, YearSummary, AppMetadata, Category, CategorySummary } from "../types";
+import { syncService } from "./syncService";
+import { authService } from "./authService";
 
 const TRANSACTIONS_KEY = "cashflow_transactions";
 const METADATA_KEY = "cashflow_metadata";
@@ -82,7 +84,18 @@ export const transactionService = {
 
   // Save categories
   saveCategories(categories: Category[]): boolean {
-    return safeWrite<Category[]>(CATEGORIES_KEY, categories);
+    const success = safeWrite<Category[]>(CATEGORIES_KEY, categories);
+    if (success) {
+      categories.filter(c => c.isCustom).forEach(cat => {
+        syncService.enqueue({
+          entity: "category",
+          action: "upsert",
+          recordId: cat.id,
+          payload: cat
+        });
+      });
+    }
+    return success;
   },
 
   // Get summaries
@@ -92,7 +105,18 @@ export const transactionService = {
 
   // Save summaries
   saveYearlySummaries(summaries: YearSummary[]): boolean {
-    return safeWrite<YearSummary[]>(SUMMARIES_KEY, summaries);
+    const success = safeWrite<YearSummary[]>(SUMMARIES_KEY, summaries);
+    if (success) {
+      summaries.forEach(sum => {
+        syncService.enqueue({
+          entity: "summary",
+          action: "upsert",
+          recordId: String(sum.year),
+          payload: sum
+        });
+      });
+    }
+    return success;
   },
 
   // Get metadata
@@ -199,33 +223,78 @@ export const transactionService = {
   saveTransaction(transaction: Transaction): StorageResult<Transaction[]> {
     const transactions = this.getTransactions();
     const index = transactions.findIndex(t => t.id === transaction.id);
+    const currentUser = authService.getCurrentUser();
     
+    let txToSave: Transaction;
     if (index > -1) {
       // Edit
-      transactions[index] = {
+      txToSave = {
         ...transaction,
+        userId: transaction.userId || currentUser?.id,
         updatedAt: new Date().toISOString()
       };
+      transactions[index] = txToSave;
     } else {
       // Create new
-      transactions.push({
+      txToSave = {
         ...transaction,
-        createdAt: new Date().toISOString(),
+        userId: transaction.userId || currentUser?.id,
+        createdAt: transaction.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      });
+      };
+      transactions.push(txToSave);
     }
 
-    // Update last category usage in metadata if needed or handle sorted categories
-    // Sort logic will be handled live by checking transaction patterns
+    const result = this.saveTransactions(transactions);
+    if (result.success) {
+      syncService.enqueue({
+        entity: "transaction",
+        action: "upsert",
+        recordId: txToSave.id,
+        payload: txToSave
+      });
+    }
     
-    return this.saveTransactions(transactions);
+    return result;
+  },
+
+  // Migrate guest data to logged-in user
+  migrateGuestDataToUser(userId: string): void {
+    const transactions = this.getTransactions();
+    let hasChanged = false;
+    const updatedTxs = transactions.map((t) => {
+      if (!t.userId || t.userId !== userId) {
+        hasChanged = true;
+        const updated = { ...t, userId };
+        syncService.enqueue({
+          entity: "transaction",
+          action: "upsert",
+          recordId: updated.id,
+          payload: updated
+        });
+        return updated;
+      }
+      return t;
+    });
+
+    if (hasChanged) {
+      this.saveTransactions(updatedTxs);
+    }
   },
 
   // Delete transaction
   deleteTransaction(id: string): StorageResult<Transaction[]> {
     const transactions = this.getTransactions();
     const filtered = transactions.filter(t => t.id !== id);
-    return this.saveTransactions(filtered);
+    const result = this.saveTransactions(filtered);
+    if (result.success) {
+      syncService.enqueue({
+        entity: "transaction",
+        action: "delete",
+        recordId: id
+      });
+    }
+    return result;
   },
 
   // Clear all data

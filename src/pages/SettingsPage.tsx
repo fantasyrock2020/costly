@@ -5,6 +5,7 @@ import { t } from "../utils/translations";
 import { transactionService } from "../services/transactionService";
 import { Card } from "../components/ui/Card";
 import Button from "../components/ui/Button";
+import { SupabaseSyncSettings } from "../components/settings/SupabaseSyncSettings";
 
 interface SettingsPageProps {
   categories: Category[];
@@ -381,7 +382,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </Card>
 
-      {/* 2. Data Backup and Restore Operations */}
+      {/* 2. Supabase Cloud Sync and Offline configuration */}
+      <SupabaseSyncSettings onDataReset={onDataReset} />
+
+      {/* 3. Data Backup and Restore Operations */}
       <Card variant="default" className="space-y-4">
         <div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider mb-1">

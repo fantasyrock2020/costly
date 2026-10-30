@@ -1,5 +1,12 @@
+export interface AuthUser {
+  id: string;
+  email: string;
+  createdAt?: string;
+}
+
 export interface Transaction {
   id: string;
+  userId?: string;
   type: "income" | "expense";
   amount: number;
   category: string; // Stored as the category name, e.g., "🍜 Ăn uống" or just the category object ID/name
@@ -18,6 +25,7 @@ export interface CategorySummary {
 
 export interface YearSummary {
   year: number;
+  userId?: string;
   totalIncome: number;
   totalExpense: number;
   balance: number;
@@ -35,6 +43,7 @@ export interface AppMetadata {
 
 export interface Category {
   id: string;
+  userId?: string;
   name: string; // Display name (without emoji if separate, or including emoji)
   icon: string; // Emoji, e.g. "🍜"
   type: "income" | "expense";

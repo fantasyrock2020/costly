@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import type { Transaction, Category, AppMetadata, YearSummary } from "./types";
 import { transactionService } from "./services/transactionService";
+import { syncService } from "./services/syncService";
+import { authService } from "./services/authService";
 import { getTodayISO, parseISODate } from "./utils/date";
 import { t } from "./utils/translations";
 
@@ -11,6 +13,7 @@ import Header from "./components/layout/Header";
 import OnboardingScreen from "./components/layout/OnboardingScreen";
 import TransactionModal from "./components/transactions/TransactionModal";
 import YearlySummaryModal from "./components/dashboard/YearlySummaryModal";
+import AuthModal from "./components/auth/AuthModal";
 
 import Dashboard from "./pages/Dashboard";
 import TransactionsPage from "./pages/TransactionsPage";
@@ -36,6 +39,7 @@ function App() {
 
   // Modals state
   const [isTxModalOpen, setIsTxModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [txModalType, setTxModalType] = useState<"income" | "expense" | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
@@ -67,6 +71,38 @@ function App() {
 
   useEffect(() => {
     loadAllData();
+
+    // Trigger initial background sync
+    syncService.sync();
+
+    // Listen to background sync data changes (e.g. pulled from cloud)
+    const unsubscribeSync = syncService.onDataUpdate(() => {
+      loadAllData();
+    });
+
+    // Listen to auth changes (login / logout / Google OAuth redirect)
+    let previousUserId: string | null = authService.getCurrentUser()?.id || null;
+    const unsubscribeAuth = authService.subscribe((user) => {
+      const newUserId = user?.id || null;
+      const isNewLogin = newUserId !== null && newUserId !== previousUserId;
+      previousUserId = newUserId;
+
+      if (isNewLogin) {
+        // New login detected (email/password or Google OAuth redirect)
+        // Full sync: migrate local → upload → pull remote → reload
+        syncService.syncAfterLogin(newUserId).then(() => {
+          loadAllData();
+        });
+      } else {
+        // Logout or same user refresh
+        loadAllData();
+      }
+    });
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeAuth();
+    };
   }, []);
 
   // 2. Perform yearly lifecycle rollover checks when transactions are loaded
@@ -223,6 +259,8 @@ function App() {
             setSelectedMonth(m);
           }}
           title={getPageTitle()}
+          onNavigateToSettings={() => setCurrentPage("settings")}
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
         />
 
         {/* Scrollable content container */}
@@ -303,6 +341,11 @@ function App() {
           onClose={handleCloseYearPopup}
         />
       )}
+    {/* Auth Modal */}
+    <AuthModal
+      isOpen={isAuthModalOpen}
+      onClose={() => setIsAuthModalOpen(false)}
+    />
     </div>
   );
 }
