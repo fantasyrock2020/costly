@@ -2,7 +2,7 @@
 -- SQL SCHEMA CHO DÒNG TIỀN CÁ NHÂN (HỖ TRỢ ĐA NGƯỜI DÙNG - MULTI-USER)
 -- ============================================================
 -- Hướng dẫn:
--- 1. Đăng nhập https://supabase.com/dashboard/project/idbkualwmlaraashzlro
+-- 1. Đăng nhập https://supabase.com/
 -- 2. Vào mục "SQL Editor" ở thanh menu bên trái.
 -- 3. Tạo "New Query", dán toàn bộ nội dung script này vào và bấm "Run".
 -- ============================================================
