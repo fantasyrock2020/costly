@@ -12,6 +12,7 @@ export interface SyncQueueItem {
   entity: "transaction" | "category" | "summary";
   action: "upsert" | "delete";
   recordId: string;
+  userId?: string;
   payload?: any;
   timestamp: number;
   attempts: number;
@@ -154,12 +155,14 @@ class SyncService {
     entity: "transaction" | "category" | "summary";
     action: "upsert" | "delete";
     recordId: string;
+    userId?: string;
     payload?: any;
   }) {
+    const userId = item.userId || item.payload?.userId || authService.getCurrentUser()?.id;
     const queue = this.getQueue();
     // Check if recordId is already in queue
     const existingIndex = queue.findIndex(
-      (q) => q.entity === item.entity && q.recordId === item.recordId
+      (q) => q.entity === item.entity && q.recordId === item.recordId && q.userId === userId
     );
 
     if (existingIndex > -1) {
@@ -167,6 +170,7 @@ class SyncService {
       if (item.action === "delete") {
         queue[existingIndex] = {
           ...existing,
+          userId,
           action: "delete",
           payload: undefined,
           timestamp: Date.now()
@@ -174,6 +178,7 @@ class SyncService {
       } else {
         queue[existingIndex] = {
           ...existing,
+          userId,
           action: "upsert",
           payload: item.payload,
           timestamp: Date.now()
@@ -185,6 +190,7 @@ class SyncService {
         entity: item.entity,
         action: item.action,
         recordId: item.recordId,
+        userId,
         payload: item.payload,
         timestamp: Date.now(),
         attempts: 0
@@ -218,6 +224,12 @@ class SyncService {
       return { success: false, message: "Đang trong quá trình đồng bộ..." };
     }
 
+    const activeUser = authService.getCurrentUser();
+    if (!activeUser || activeUser.isGuest) {
+      this.updateState({ status: supabaseClientService.isConfigured() ? "idle" : "unconfigured" });
+      return { success: true, message: "Dữ liệu guest được lưu trên thiết bị." };
+    }
+
     if (!navigator.onLine) {
       this.updateState({ isOnline: false, status: "offline" });
       return { success: false, message: "Không có kết nối mạng (Offline)." };
@@ -241,6 +253,11 @@ class SyncService {
       for (const item of queue) {
         try {
           const currentUser = authService.getCurrentUser();
+          const itemUserId = item.userId || item.payload?.userId;
+          if (!currentUser || currentUser.isGuest || itemUserId !== currentUser.id) {
+            remainingQueue.push({ ...item, userId: itemUserId });
+            continue;
+          }
 
           if (item.entity === "transaction") {
             if (item.action === "upsert" && item.payload) {
@@ -324,10 +341,7 @@ class SyncService {
           console.error(`Failed to push sync item ${item.id}:`, itemErr);
           pushErrors++;
           item.attempts += 1;
-          // Keep item in queue to retry if under 5 attempts
-          if (item.attempts < 5) {
-            remainingQueue.push(item);
-          }
+          remainingQueue.push(item);
         }
       }
 
@@ -335,7 +349,12 @@ class SyncService {
 
       // 2. PULL PHASE: Pull remote updates and merge with local storage
       let hasDataChanged = false;
-      const pendingRecordIds = new Set(remainingQueue.map((q) => q.recordId));
+      const activeUserId = authService.getCurrentUser()?.id;
+      const pendingRecordIds = new Set(
+        remainingQueue
+          .filter((item) => item.userId === activeUserId)
+          .map((item) => item.recordId)
+      );
 
       // Fetch active transactions from Supabase
       const { data: remoteTxs, error: txError } = await client
@@ -482,18 +501,22 @@ class SyncService {
     }
 
     try {
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser || currentUser.isGuest) {
+        return { success: false, message: "Vui lòng đăng nhập trước khi tải dữ liệu lên Supabase." };
+      }
+
       this.updateState({ status: "syncing" });
 
       // Transactions
       const localTxsRaw = localStorage.getItem("cashflow_transactions");
-      const localTxs: Transaction[] = localTxsRaw ? JSON.parse(localTxsRaw) : [];
-
-      const currentUser = authService.getCurrentUser();
+      const localTxs: Transaction[] = (localTxsRaw ? JSON.parse(localTxsRaw) : [])
+        .filter((tx: Transaction) => tx.userId === currentUser.id);
 
       if (localTxs.length > 0) {
         const rows = localTxs.map((tx) => ({
           id: tx.id,
-          user_id: currentUser?.id || tx.userId || null,
+          user_id: currentUser.id,
           type: tx.type,
           amount: tx.amount,
           category: tx.category,
@@ -515,10 +538,12 @@ class SyncService {
 
       // Categories
       const localCatsRaw = localStorage.getItem("cashflow_categories");
-      const localCats: Category[] = localCatsRaw ? JSON.parse(localCatsRaw) : [];
+      const localCats: Category[] = (localCatsRaw ? JSON.parse(localCatsRaw) : [])
+        .filter((category: Category) => category.isCustom && category.userId === currentUser.id);
       if (localCats.length > 0) {
         const catRows = localCats.map((c) => ({
           id: c.id,
+          user_id: currentUser.id,
           name: c.name,
           icon: c.icon,
           type: c.type,
@@ -526,14 +551,18 @@ class SyncService {
           updated_at: new Date().toISOString(),
           deleted_at: null
         }));
-        await client.from("categories").upsert(catRows);
+        const { error } = await client.from("categories").upsert(catRows);
+        if (error) throw error;
       }
 
       // Yearly summaries
       const localSumsRaw = localStorage.getItem("cashflow_yearly_summaries");
-      const localSums: YearSummary[] = localSumsRaw ? JSON.parse(localSumsRaw) : [];
+      const localSums: YearSummary[] = (localSumsRaw ? JSON.parse(localSumsRaw) : [])
+        .filter((summary: YearSummary) => summary.userId === currentUser.id);
       if (localSums.length > 0) {
         const sumRows = localSums.map((s) => ({
+          id: `${currentUser.id}_${s.year}`,
+          user_id: currentUser.id,
           year: s.year,
           total_income: s.totalIncome,
           total_expense: s.totalExpense,
@@ -543,11 +572,12 @@ class SyncService {
           top_income_categories: s.topIncomeCategories,
           updated_at: new Date().toISOString()
         }));
-        await client.from("yearly_summaries").upsert(sumRows);
+        const { error } = await client.from("yearly_summaries").upsert(sumRows);
+        if (error) throw error;
       }
 
-      // Clear sync queue
-      this.saveQueue([]);
+      // Remove only this account's queued work; keep other owners' items intact.
+      this.saveQueue(this.getQueue().filter((item) => item.userId !== currentUser.id));
       const now = new Date().toISOString();
       localStorage.setItem(LAST_SYNCED_KEY, now);
       this.updateState({ status: "synced", lastSyncedAt: now, lastError: null });
@@ -570,6 +600,10 @@ class SyncService {
     if (!client) {
       return { success: false, message: "Chưa cấu hình Supabase URL và Key." };
     }
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser || currentUser.isGuest) {
+      return { success: false, message: "Vui lòng đăng nhập trước khi tải dữ liệu từ Supabase." };
+    }
 
     try {
       this.updateState({ status: "syncing" });
@@ -577,60 +611,103 @@ class SyncService {
       const { data: remoteTxs, error: txError } = await client
         .from("transactions")
         .select("*")
-        .is("deleted_at", null)
         .order("date", { ascending: false });
 
       if (txError) throw txError;
 
-      const mappedTxs: Transaction[] = (remoteTxs || []).map((r) => ({
-        id: r.id,
-        type: r.type,
-        amount: Number(r.amount),
-        category: r.category,
-        date: r.date,
-        location: r.location || undefined,
-        note: r.note || undefined,
-        createdAt: r.created_at || new Date().toISOString(),
-        updatedAt: r.updated_at || new Date().toISOString()
-      }));
-
+      const localTxsRaw = localStorage.getItem("cashflow_transactions");
+      const localTxMap = new Map<string, Transaction>(
+        ((localTxsRaw ? JSON.parse(localTxsRaw) : []) as Transaction[])
+          .filter((transaction) => transaction.userId === currentUser.id)
+          .map((transaction) => [transaction.id, transaction])
+      );
+      for (const row of remoteTxs || []) {
+        if (row.deleted_at) {
+          localTxMap.delete(row.id);
+        } else {
+          localTxMap.set(row.id, {
+            id: row.id,
+            userId: row.user_id || currentUser.id,
+            type: row.type,
+            amount: Number(row.amount),
+            category: row.category,
+            date: row.date,
+            location: row.location || undefined,
+            note: row.note || undefined,
+            createdAt: row.created_at || new Date().toISOString(),
+            updatedAt: row.updated_at || new Date().toISOString()
+          });
+        }
+      }
+      const mappedTxs = Array.from(localTxMap.values());
       localStorage.setItem("cashflow_transactions", JSON.stringify(mappedTxs));
 
       // Categories
-      const { data: remoteCats } = await client
+      const { data: remoteCats, error: catsError } = await client
         .from("categories")
-        .select("*")
-        .is("deleted_at", null);
+        .select("*");
+      if (catsError) throw catsError;
 
-      if (remoteCats && remoteCats.length > 0) {
-        const mappedCats: Category[] = remoteCats.map((c) => ({
-          id: c.id,
-          name: c.name,
-          icon: c.icon,
-          type: c.type,
-          isCustom: c.is_custom
-        }));
-        localStorage.setItem("cashflow_categories", JSON.stringify(mappedCats));
+      if (remoteCats) {
+        const localCatsRaw = localStorage.getItem("cashflow_categories");
+        const localCats: Category[] = localCatsRaw ? JSON.parse(localCatsRaw) : [];
+        const localCatMap = new Map<string, Category>(
+          localCats
+            .filter((category) => category.isCustom && category.userId === currentUser.id)
+            .map((category) => [category.id, category])
+        );
+        for (const row of remoteCats) {
+          if (row.deleted_at) {
+            localCatMap.delete(row.id);
+          } else {
+            localCatMap.set(row.id, {
+              id: row.id,
+              userId: row.user_id || currentUser.id,
+              name: row.name,
+              icon: row.icon,
+              type: row.type,
+              isCustom: row.is_custom
+            });
+          }
+        }
+        const defaultCategories = localCats.filter((category) => !category.isCustom);
+        const defaults = defaultCategories.length > 0
+          ? defaultCategories
+          : (await import("./transactionService")).DEFAULT_CATEGORIES;
+        localStorage.setItem(
+          "cashflow_categories",
+          JSON.stringify([...defaults, ...localCatMap.values()])
+        );
       }
 
       // Summaries
-      const { data: remoteSums } = await client.from("yearly_summaries").select("*");
-      if (remoteSums && remoteSums.length > 0) {
-        const mappedSums: YearSummary[] = remoteSums.map((s) => ({
-          year: s.year,
-          totalIncome: Number(s.total_income),
-          totalExpense: Number(s.total_expense),
-          balance: Number(s.balance),
-          transactionCount: Number(s.transaction_count),
-          topExpenseCategories: s.top_expense_categories || [],
-          topIncomeCategories: s.top_income_categories || []
-        }));
-        localStorage.setItem("cashflow_yearly_summaries", JSON.stringify(mappedSums));
+      const { data: remoteSums, error: summariesError } = await client.from("yearly_summaries").select("*");
+      if (summariesError) throw summariesError;
+      if (remoteSums) {
+        const localSumsRaw = localStorage.getItem("cashflow_yearly_summaries");
+        const localSumMap = new Map<number, YearSummary>(
+          ((localSumsRaw ? JSON.parse(localSumsRaw) : []) as YearSummary[])
+            .filter((summary) => summary.userId === currentUser.id)
+            .map((summary) => [summary.year, summary])
+        );
+        for (const row of remoteSums) {
+          localSumMap.set(row.year, {
+            year: row.year,
+            userId: row.user_id || currentUser.id,
+            totalIncome: Number(row.total_income),
+            totalExpense: Number(row.total_expense),
+            balance: Number(row.balance),
+            transactionCount: Number(row.transaction_count),
+            topExpenseCategories: row.top_expense_categories || [],
+            topIncomeCategories: row.top_income_categories || []
+          });
+        }
+        localStorage.setItem("cashflow_yearly_summaries", JSON.stringify([...localSumMap.values()]));
       }
 
       const now = new Date().toISOString();
       localStorage.setItem(LAST_SYNCED_KEY, now);
-      this.saveQueue([]);
+      this.saveQueue(this.getQueue().filter((item) => item.userId !== currentUser.id));
       this.updateState({ status: "synced", lastSyncedAt: now, lastError: null });
       this.notifyDataUpdate();
 
@@ -654,27 +731,47 @@ class SyncService {
    * 4. Notify UI to reload
    */
   public async syncAfterLogin(userId: string): Promise<{ success: boolean; message: string }> {
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser || currentUser.id !== userId || currentUser.isGuest) {
+      return { success: false, message: "Tài khoản đăng nhập không hợp lệ để đồng bộ." };
+    }
+    if (this.isSyncing) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      return this.syncAfterLogin(userId);
+    }
+
+    this.isSyncing = true;
     try {
+      const { transactionService } = await import("./transactionService");
+      const activation = transactionService.activateDataForUser(userId, false);
+      if (!activation.success) {
+        throw new Error(activation.error || "Không thể mở dữ liệu local của tài khoản.");
+      }
+
       // Step 1: Migrate any local data that doesn't have a userId
       // Dynamic import to avoid circular dependency (syncService ↔ transactionService)
-      const mod = await import("./transactionService");
-      mod.transactionService.migrateGuestDataToUser(userId);
+      const migrationResult = transactionService.migrateGuestDataToUser(userId);
+      if (!migrationResult.success) {
+        throw new Error(migrationResult.error || "Không thể chuyển dữ liệu guest sang tài khoản.");
+      }
 
       // Step 2: Upload all local data to Supabase
       const uploadResult = await this.uploadAllLocalData();
       if (!uploadResult.success) {
-        console.warn("Post-login upload partial failure:", uploadResult.message);
-        // Continue anyway — pull will merge
+        throw new Error(uploadResult.message);
       }
 
       // Step 3: Pull all remote data for this user and merge
       const pullResult = await this.pullAllRemoteData();
       if (!pullResult.success) {
-        console.warn("Post-login pull failure:", pullResult.message);
+        throw new Error(pullResult.message);
       }
 
       // Step 4: Clear sync queue (everything is now in sync)
-      this.saveQueue([]);
+      const guestUserId = authService.getGuestUserId();
+      this.saveQueue(this.getQueue().filter(
+        (item) => item.userId !== userId && item.userId !== guestUserId
+      ));
       const now = new Date().toISOString();
       localStorage.setItem(LAST_SYNCED_KEY, now);
       this.updateState({ status: "synced", lastSyncedAt: now, lastError: null });
@@ -686,7 +783,11 @@ class SyncService {
       };
     } catch (e: any) {
       console.error("syncAfterLogin error:", e);
-      return { success: false, message: e.message || "Lỗi đồng bộ sau đăng nhập." };
+      const message = e.message || "Lỗi đồng bộ sau đăng nhập.";
+      this.updateState({ status: "error", lastError: message });
+      return { success: false, message };
+    } finally {
+      this.isSyncing = false;
     }
   }
 }

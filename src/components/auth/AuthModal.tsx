@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { X, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, CheckCircle2, AlertCircle } from "lucide-react";
 import { authService } from "../../services/authService";
-import { syncService } from "../../services/syncService";
 import type { AuthUser } from "../../types";
 import Button from "../ui/Button";
 
@@ -50,8 +49,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
       if (res.success) {
         if (res.user) {
-          // Auto signed in — sync all local data to this account
-          syncService.syncAfterLogin(res.user.id);
           onSuccess?.(res.user);
           onClose();
         } else {
@@ -67,8 +64,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       setIsLoading(false);
 
       if (res.success && res.user) {
-        // Sync all local data to this account, then load remote data
-        syncService.syncAfterLogin(res.user.id);
         onSuccess?.(res.user);
         onClose();
       } else {

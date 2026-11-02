@@ -6,6 +6,49 @@ const TRANSACTIONS_KEY = "cashflow_transactions";
 const METADATA_KEY = "cashflow_metadata";
 const SUMMARIES_KEY = "cashflow_yearly_summaries";
 const CATEGORIES_KEY = "cashflow_categories";
+const ACTIVE_DATA_OWNER_KEY = "cashflow_active_data_owner";
+const GUEST_DATA_KEY = "cashflow_guest_data";
+
+interface LocalDataSnapshot {
+  transactions: Transaction[];
+  categories: Category[];
+  summaries: YearSummary[];
+}
+
+function readLocalDataSnapshot(): LocalDataSnapshot {
+  return {
+    transactions: safeRead<Transaction[]>(TRANSACTIONS_KEY, []),
+    categories: safeRead<Category[]>(CATEGORIES_KEY, []),
+    summaries: safeRead<YearSummary[]>(SUMMARIES_KEY, [])
+  };
+}
+
+function writeLocalDataSnapshot(snapshot: LocalDataSnapshot): boolean {
+  return (
+    safeWrite(TRANSACTIONS_KEY, snapshot.transactions) &&
+    safeWrite(CATEGORIES_KEY, snapshot.categories) &&
+    safeWrite(SUMMARIES_KEY, snapshot.summaries)
+  );
+}
+
+function getOwnerDataKey(userId: string): string {
+  return `cashflow_user_data_${userId}`;
+}
+
+function saveGuestSnapshot(snapshot: LocalDataSnapshot, guestUserId: string): void {
+  const guestUserIds = new Set(authService.getGuestUserIds());
+  guestUserIds.add(guestUserId);
+  const isGuestData = (userId?: string) =>
+    !userId || guestUserIds.has(userId) || userId.startsWith("guest-");
+  const guestSnapshot: LocalDataSnapshot = {
+    transactions: snapshot.transactions.filter((transaction) => isGuestData(transaction.userId)),
+    categories: snapshot.categories.filter((category) => !category.isCustom || isGuestData(category.userId)),
+    summaries: snapshot.summaries.filter((summary) => isGuestData(summary.userId))
+  };
+  if (!safeWrite(GUEST_DATA_KEY, guestSnapshot)) {
+    console.error("Could not preserve guest data in LocalStorage.");
+  }
+}
 
 export const DEFAULT_CATEGORIES: Category[] = [
   // Expenses
@@ -62,6 +105,47 @@ function safeWrite<T>(key: string, data: T): boolean {
 }
 
 export const transactionService = {
+  activateDataForUser(userId: string, isGuest: boolean): { success: boolean; error?: string } {
+    const activeOwnerId = localStorage.getItem(ACTIVE_DATA_OWNER_KEY);
+    const currentSnapshot = readLocalDataSnapshot();
+
+    if (activeOwnerId === userId) {
+      if (isGuest) saveGuestSnapshot(currentSnapshot, userId);
+      return { success: true };
+    }
+
+    if (activeOwnerId) {
+      const ownerSnapshotKey = getOwnerDataKey(activeOwnerId);
+      if (!safeWrite(ownerSnapshotKey, currentSnapshot)) {
+        return { success: false, error: "Không thể lưu dữ liệu của tài khoản hiện tại." };
+      }
+      if (authService.isGuestUserId(activeOwnerId)) {
+        saveGuestSnapshot(currentSnapshot, activeOwnerId);
+      }
+    } else if (!isGuest) {
+      saveGuestSnapshot(currentSnapshot, authService.ensureGuestUserId());
+    }
+
+    let nextSnapshot: LocalDataSnapshot | null = safeRead<LocalDataSnapshot | null>(
+      getOwnerDataKey(userId),
+      null
+    );
+    if (isGuest) {
+      const guestSnapshot = safeRead<LocalDataSnapshot | null>(GUEST_DATA_KEY, null);
+      if (guestSnapshot) nextSnapshot = guestSnapshot;
+    } else if (!activeOwnerId && !nextSnapshot) {
+      // Adopt existing unscoped local data once when installing the per-user storage.
+      nextSnapshot = currentSnapshot;
+    }
+
+    if (!writeLocalDataSnapshot(nextSnapshot || { transactions: [], categories: [], summaries: [] })) {
+      return { success: false, error: "Không thể tải dữ liệu local cho tài khoản hiện tại." };
+    }
+    localStorage.setItem(ACTIVE_DATA_OWNER_KEY, userId);
+    if (isGuest) saveGuestSnapshot(nextSnapshot || currentSnapshot, userId);
+    return { success: true };
+  },
+
   // Get all transactions
   getTransactions(): Transaction[] {
     return safeRead<Transaction[]>(TRANSACTIONS_KEY, []);
@@ -73,6 +157,8 @@ export const transactionService = {
     if (!success) {
       return { success: false, error: "Unable to save your transaction. Please check your browser storage settings." };
     }
+    const currentUser = authService.getCurrentUser();
+    if (currentUser?.isGuest) saveGuestSnapshot(readLocalDataSnapshot(), currentUser.id);
     return { success: true, data: transactions };
   },
 
@@ -84,9 +170,17 @@ export const transactionService = {
 
   // Save categories
   saveCategories(categories: Category[]): boolean {
-    const success = safeWrite<Category[]>(CATEGORIES_KEY, categories);
+    const currentUserId = authService.getCurrentUser()?.id;
+    const categoriesToSave = categories.map((category) =>
+      category.isCustom && !category.userId
+        ? { ...category, userId: currentUserId }
+        : category
+    );
+    const success = safeWrite<Category[]>(CATEGORIES_KEY, categoriesToSave);
     if (success) {
-      categories.filter(c => c.isCustom).forEach(cat => {
+      const currentUser = authService.getCurrentUser();
+      if (currentUser?.isGuest) saveGuestSnapshot(readLocalDataSnapshot(), currentUser.id);
+      categoriesToSave.filter(c => c.isCustom).forEach(cat => {
         syncService.enqueue({
           entity: "category",
           action: "upsert",
@@ -105,9 +199,15 @@ export const transactionService = {
 
   // Save summaries
   saveYearlySummaries(summaries: YearSummary[]): boolean {
-    const success = safeWrite<YearSummary[]>(SUMMARIES_KEY, summaries);
+    const currentUserId = authService.getCurrentUser()?.id;
+    const summariesToSave = summaries.map((summary) =>
+      summary.userId ? summary : { ...summary, userId: currentUserId }
+    );
+    const success = safeWrite<YearSummary[]>(SUMMARIES_KEY, summariesToSave);
     if (success) {
-      summaries.forEach(sum => {
+      const currentUser = authService.getCurrentUser();
+      if (currentUser?.isGuest) saveGuestSnapshot(readLocalDataSnapshot(), currentUser.id);
+      summariesToSave.forEach(sum => {
         syncService.enqueue({
           entity: "summary",
           action: "upsert",
@@ -259,39 +359,110 @@ export const transactionService = {
   },
 
   // Migrate guest data to logged-in user
-  migrateGuestDataToUser(userId: string): void {
-    const transactions = this.getTransactions();
-    let hasChanged = false;
-    const updatedTxs = transactions.map((t) => {
-      if (!t.userId || t.userId !== userId) {
-        hasChanged = true;
-        const updated = { ...t, userId };
-        syncService.enqueue({
-          entity: "transaction",
-          action: "upsert",
-          recordId: updated.id,
-          payload: updated
-        });
-        return updated;
-      }
-      return t;
+  migrateGuestDataToUser(userId: string): { success: boolean; error?: string } {
+    const guestUserId = authService.getGuestUserId();
+    const belongsToGuest = (recordUserId?: string) =>
+      !recordUserId ||
+      authService.isGuestUserId(recordUserId);
+    if (!guestUserId) {
+      return { success: false, error: "Không tìm thấy UUID guest để chuyển dữ liệu." };
+    }
+
+    const activeSnapshot = readLocalDataSnapshot();
+    const storedGuestSnapshot = safeRead<LocalDataSnapshot | null>(GUEST_DATA_KEY, null);
+    const guestSnapshot = storedGuestSnapshot || {
+      transactions: activeSnapshot.transactions.filter((transaction) => belongsToGuest(transaction.userId)),
+      categories: activeSnapshot.categories.filter((category) =>
+        category.isCustom && belongsToGuest(category.userId)
+      ),
+      summaries: activeSnapshot.summaries.filter((summary) => belongsToGuest(summary.userId))
+    };
+
+    saveGuestSnapshot(guestSnapshot, guestUserId);
+
+    const transactions = new Map<string, Transaction>();
+    guestSnapshot.transactions.forEach((transaction) => {
+      transactions.set(transaction.id, { ...transaction, userId });
+    });
+    activeSnapshot.transactions.forEach((transaction) => {
+      if (transaction.userId === userId) transactions.set(transaction.id, transaction);
     });
 
-    if (hasChanged) {
-      this.saveTransactions(updatedTxs);
+    const categories = new Map<string, Category>();
+    guestSnapshot.categories.filter((category) => category.isCustom).forEach((category) => {
+      categories.set(category.id, { ...category, userId });
+    });
+    activeSnapshot.categories
+      .filter((category) => !category.isCustom || category.userId === userId)
+      .forEach((category) => {
+        if (category.isCustom) categories.set(category.id, category);
+      });
+
+    const summaries = new Map<number, YearSummary>();
+    guestSnapshot.summaries.forEach((summary) => {
+      summaries.set(summary.year, { ...summary, userId });
+    });
+    activeSnapshot.summaries
+      .filter((summary) => summary.userId === userId)
+      .forEach((summary) => summaries.set(summary.year, summary));
+
+    const migratedSnapshot: LocalDataSnapshot = {
+      transactions: Array.from(transactions.values()),
+      categories: [
+        ...activeSnapshot.categories.filter((category) => !category.isCustom),
+        ...Array.from(categories.values())
+      ],
+      summaries: Array.from(summaries.values())
+    };
+    if (!writeLocalDataSnapshot(migratedSnapshot)) {
+      return { success: false, error: "Không thể lưu dữ liệu guest đã chuyển sang tài khoản." };
     }
+
+    guestSnapshot.transactions.forEach((transaction) => {
+      const migrated = { ...transaction, userId };
+      syncService.enqueue({
+        entity: "transaction",
+        action: "upsert",
+        recordId: migrated.id,
+        userId,
+        payload: migrated
+      });
+    });
+    guestSnapshot.categories.filter((category) => category.isCustom).forEach((category) => {
+      const migrated = { ...category, userId };
+      syncService.enqueue({
+        entity: "category",
+        action: "upsert",
+        recordId: migrated.id,
+        userId,
+        payload: migrated
+      });
+    });
+    guestSnapshot.summaries.forEach((summary) => {
+      const migrated = { ...summary, userId };
+      syncService.enqueue({
+        entity: "summary",
+        action: "upsert",
+        recordId: String(migrated.year),
+        userId,
+        payload: migrated
+      });
+    });
+    return { success: true };
   },
 
   // Delete transaction
   deleteTransaction(id: string): StorageResult<Transaction[]> {
     const transactions = this.getTransactions();
+    const deletedTransaction = transactions.find((transaction) => transaction.id === id);
     const filtered = transactions.filter(t => t.id !== id);
     const result = this.saveTransactions(filtered);
     if (result.success) {
       syncService.enqueue({
         entity: "transaction",
         action: "delete",
-        recordId: id
+        recordId: id,
+        userId: deletedTransaction?.userId
       });
     }
     return result;
@@ -303,6 +474,10 @@ export const transactionService = {
     localStorage.removeItem(METADATA_KEY);
     localStorage.removeItem(SUMMARIES_KEY);
     localStorage.removeItem(CATEGORIES_KEY);
+    localStorage.removeItem(GUEST_DATA_KEY);
+    localStorage.removeItem(ACTIVE_DATA_OWNER_KEY);
+    const userDataKeys = Object.keys(localStorage).filter((key) => key.startsWith("cashflow_user_data_"));
+    userDataKeys.forEach((key) => localStorage.removeItem(key));
   },
 
   // Export JSON backup

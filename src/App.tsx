@@ -84,13 +84,29 @@ function App() {
     let previousUserId: string | null = authService.getCurrentUser()?.id || null;
     const unsubscribeAuth = authService.subscribe((user) => {
       const newUserId = user?.id || null;
-      const isNewLogin = newUserId !== null && newUserId !== previousUserId;
+      const activeDataOwnerId = localStorage.getItem("cashflow_active_data_owner");
+      const needsAccountSync = Boolean(
+        user && !user.isGuest &&
+        (newUserId !== previousUserId || activeDataOwnerId !== user.id)
+      );
       previousUserId = newUserId;
 
-      if (isNewLogin) {
-        // New login detected (email/password or Google OAuth redirect)
+      if (user) {
+        const activation = transactionService.activateDataForUser(user.id, !!user.isGuest);
+        if (!activation.success) {
+          console.error("Could not activate local data for user:", activation.error);
+          loadAllData();
+          return;
+        }
+      }
+
+      if (needsAccountSync && user) {
+        // Login or account-context restoration (including OAuth redirect)
         // Full sync: migrate local → upload → pull remote → reload
-        syncService.syncAfterLogin(newUserId).then(() => {
+        syncService.syncAfterLogin(user.id).then((result) => {
+          if (!result.success) {
+            console.error("Could not complete post-login sync:", result.message);
+          }
           loadAllData();
         });
       } else {

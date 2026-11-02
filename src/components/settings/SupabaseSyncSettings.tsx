@@ -25,9 +25,10 @@ interface SupabaseSyncSettingsProps {
   onDataReset: () => void;
 }
 
-const SQL_SCHEMA = `-- 1. BẢNG TRANSACTIONS (Giao dịch thu / chi)
+const SQL_SCHEMA = `-- 1. BẢNG TRANSACTIONS (Giao dịch thu / chi gắn với Supabase Auth user)
 CREATE TABLE IF NOT EXISTS public.transactions (
     id TEXT PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
     type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
     amount NUMERIC NOT NULL,
     category TEXT NOT NULL,
@@ -39,6 +40,10 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     deleted_at TIMESTAMPTZ
 );
 
+ALTER TABLE public.transactions
+ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid();
+
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_updated_at ON public.transactions(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_deleted_at ON public.transactions(deleted_at);
@@ -55,9 +60,11 @@ CREATE TABLE IF NOT EXISTS public.categories (
     deleted_at TIMESTAMPTZ
 );
 
--- 3. BẢNG YEARLY_SUMMARIES (Lịch sử năm)
+-- 3. BẢNG YEARLY_SUMMARIES (Lịch sử năm của từng user)
 CREATE TABLE IF NOT EXISTS public.yearly_summaries (
-    year INT PRIMARY KEY,
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+    year INT NOT NULL,
     total_income NUMERIC NOT NULL DEFAULT 0,
     total_expense NUMERIC NOT NULL DEFAULT 0,
     balance NUMERIC NOT NULL DEFAULT 0,
@@ -67,25 +74,48 @@ CREATE TABLE IF NOT EXISTS public.yearly_summaries (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. CẤP QUYỀN TRUY CẬP CHO ANON & AUTHENTICATED
-GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT ALL ON TABLE public.transactions TO anon, authenticated;
-GRANT ALL ON TABLE public.categories TO anon, authenticated;
-GRANT ALL ON TABLE public.yearly_summaries TO anon, authenticated;
+ALTER TABLE public.yearly_summaries
+ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid();
 
--- 5. BẬT RLS & CHÍNH SÁCH TRUY CẬP
+CREATE INDEX IF NOT EXISTS idx_yearly_summaries_user_id ON public.yearly_summaries(user_id);
+
+-- 4. Chỉ cấp quyền cho user đã đăng nhập; mỗi user chỉ truy cập dữ liệu của mình
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT ALL ON TABLE public.transactions, public.categories, public.yearly_summaries TO authenticated;
+
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.yearly_summaries ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public full access transactions" ON public.transactions;
-CREATE POLICY "Public full access transactions" ON public.transactions FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "User select own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "User insert own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "User update own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "User delete own transactions" ON public.transactions;
+CREATE POLICY "User select own transactions" ON public.transactions
+    FOR SELECT TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "User insert own transactions" ON public.transactions
+    FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "User update own transactions" ON public.transactions
+    FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "User delete own transactions" ON public.transactions
+    FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Public full access categories" ON public.categories;
-CREATE POLICY "Public full access categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Public full access yearly_summaries" ON public.yearly_summaries;
-CREATE POLICY "Public full access yearly_summaries" ON public.yearly_summaries FOR ALL USING (true) WITH CHECK (true);`;
+DROP POLICY IF EXISTS "User select own yearly_summaries" ON public.yearly_summaries;
+DROP POLICY IF EXISTS "User insert own yearly_summaries" ON public.yearly_summaries;
+DROP POLICY IF EXISTS "User update own yearly_summaries" ON public.yearly_summaries;
+DROP POLICY IF EXISTS "User delete own yearly_summaries" ON public.yearly_summaries;
+CREATE POLICY "User select own yearly_summaries" ON public.yearly_summaries
+    FOR SELECT TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "User insert own yearly_summaries" ON public.yearly_summaries
+    FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "User update own yearly_summaries" ON public.yearly_summaries
+    FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "User delete own yearly_summaries" ON public.yearly_summaries
+    FOR DELETE TO authenticated USING (auth.uid() = user_id);`;
 
 export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onDataReset }) => {
   const [config, setConfig] = useState<SupabaseConfig>(supabaseClientService.getConfig());

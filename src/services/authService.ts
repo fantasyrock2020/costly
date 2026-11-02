@@ -2,6 +2,9 @@ import { supabaseClientService } from "./supabaseClient";
 import type { AuthUser } from "../types";
 
 const AUTH_USER_KEY = "cashflow_auth_user";
+const GUEST_USER_KEY = "cashflow_guest_user_id";
+const GUEST_AUTH_USER_KEY = "cashflow_guest_auth_user";
+const GUEST_USER_ALIASES_KEY = "cashflow_guest_user_id_aliases";
 
 type AuthListener = (user: AuthUser | null) => void;
 
@@ -30,39 +33,90 @@ class AuthService {
     // 2. Listen to Supabase Auth state changes if client is available
     const client = supabaseClientService.getClient();
     if (client) {
+      client.auth.onAuthStateChange((event, session) => {
+        if (session?.user) {
+          const isGuest = session.user.is_anonymous;
+          if (isGuest) {
+            this.rememberSupabaseGuestUser(session.user.id);
+          }
+          this.setCurrentUser({
+            id: session.user.id,
+            email: session.user.email || "",
+            createdAt: session.user.created_at,
+            isGuest
+          });
+        } else if (event !== "INITIAL_SESSION") {
+          this.setCurrentUser(this.getOrCreateGuestUser());
+        }
+      });
+
       client.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
+          const isGuest = session.user.is_anonymous;
+          if (isGuest) {
+            this.rememberSupabaseGuestUser(session.user.id);
+          }
           this.setCurrentUser({
             id: session.user.id,
             email: session.user.email || "",
-            createdAt: session.user.created_at
+            createdAt: session.user.created_at,
+            isGuest
           });
         } else {
-          // If no active session from Supabase and online, clear cached user
-          if (navigator.onLine && !this.currentUser?.id.startsWith("guest-")) {
-            this.setCurrentUser(null);
-          }
+          void this.initializeGuestUser(client);
         }
-
       }).catch((err) => {
         console.warn("Failed to get initial auth session:", err);
-
-      });
-
-      client.auth.onAuthStateChange((_event, session) => {
-        if (session?.user) {
-          this.setCurrentUser({
-            id: session.user.id,
-            email: session.user.email || "",
-            createdAt: session.user.created_at
-          });
-        } else {
-          this.setCurrentUser(null);
-        }
+        this.setCurrentUser(this.getOrCreateGuestUser());
       });
     } else {
-
+      this.setCurrentUser(this.getOrCreateGuestUser());
     }
+  }
+
+  private getOrCreateGuestUser(): AuthUser {
+    let id = localStorage.getItem(GUEST_USER_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(GUEST_USER_KEY, id);
+    }
+    return { id, email: "", isGuest: true };
+  }
+
+  private async initializeGuestUser(client: NonNullable<ReturnType<typeof supabaseClientService.getClient>>) {
+    const storedGuestId = localStorage.getItem(GUEST_USER_KEY);
+    if (storedGuestId && localStorage.getItem(GUEST_AUTH_USER_KEY) === "true") {
+      this.setCurrentUser({ id: storedGuestId, email: "", isGuest: true });
+      return;
+    }
+
+    try {
+      const { data, error } = await client.auth.signInAnonymously();
+      if (error) throw error;
+      if (!data.user) throw new Error("Supabase không trả về thông tin guest user.");
+
+      this.rememberSupabaseGuestUser(data.user.id);
+      this.setCurrentUser({
+        id: data.user.id,
+        email: "",
+        createdAt: data.user.created_at,
+        isGuest: true
+      });
+    } catch (error) {
+      console.warn("Could not create Supabase anonymous user; using a local guest ID:", error);
+      this.setCurrentUser(this.getOrCreateGuestUser());
+    }
+  }
+
+  private rememberSupabaseGuestUser(userId: string): void {
+    const previousGuestId = localStorage.getItem(GUEST_USER_KEY);
+    if (previousGuestId && previousGuestId !== userId) {
+      const aliases = this.getGuestUserIds();
+      if (!aliases.includes(previousGuestId)) aliases.push(previousGuestId);
+      localStorage.setItem(GUEST_USER_ALIASES_KEY, JSON.stringify(aliases));
+    }
+    localStorage.setItem(GUEST_USER_KEY, userId);
+    localStorage.setItem(GUEST_AUTH_USER_KEY, "true");
   }
 
   public subscribe(listener: AuthListener): () => void {
@@ -73,6 +127,30 @@ class AuthService {
 
   public getCurrentUser(): AuthUser | null {
     return this.currentUser;
+  }
+
+  public getGuestUserId(): string | null {
+    return localStorage.getItem(GUEST_USER_KEY);
+  }
+
+  public getGuestUserIds(): string[] {
+    try {
+      const aliases = JSON.parse(localStorage.getItem(GUEST_USER_ALIASES_KEY) || "[]");
+      return [...new Set([this.getGuestUserId(), ...(Array.isArray(aliases) ? aliases : [])]
+        .filter((id): id is string => typeof id === "string"))];
+    } catch (error) {
+      console.error("Could not read guest user ID aliases:", error);
+      const guestUserId = this.getGuestUserId();
+      return guestUserId ? [guestUserId] : [];
+    }
+  }
+
+  public isGuestUserId(userId: string): boolean {
+    return this.getGuestUserIds().includes(userId) || userId.startsWith("guest-");
+  }
+
+  public ensureGuestUserId(): string {
+    return this.getOrCreateGuestUser().id;
   }
 
   private setCurrentUser(user: AuthUser | null) {
@@ -205,7 +283,7 @@ class AuthService {
         console.warn("Sign out error:", e);
       }
     }
-    this.setCurrentUser(null);
+    this.setCurrentUser(this.getOrCreateGuestUser());
     return { success: true };
   }
 }

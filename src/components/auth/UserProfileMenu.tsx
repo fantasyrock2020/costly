@@ -38,7 +38,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({ onOpenAuthModa
     syncService.sync();
   };
 
-  if (!user) {
+  if (!user || user.isGuest) {
     return (
       <button
         onClick={onOpenAuthModal}
