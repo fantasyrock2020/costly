@@ -18,9 +18,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage })
   ];
 
   return (
-    <aside className="hidden md:flex flex-col w-64 fixed top-0 bottom-0 left-0 bg-white dark:bg-navy-800 border-r border-slate-100 dark:border-navy-700 z-20">
+    <aside className="hidden md:flex flex-col w-60 fixed top-0 bottom-0 left-0 bg-white dark:bg-navy-800 border-r border-slate-100 dark:border-navy-700 z-20">
       {/* Brand Logo */}
-      <div className="h-20 flex items-center px-8 border-b border-slate-100 dark:border-navy-700/50">
+      <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-navy-700/50">
         <span className="text-xl font-bold tracking-tight text-slate-800 dark:text-white flex items-center gap-2">
           <span className="bg-brand-500 text-white p-1.5 rounded-lg flex items-center justify-center">
             <BarChart3 className="w-5 h-5" />
@@ -30,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage })
       </div>
 
       {/* Nav Menu */}
-      <nav className="flex-1 py-8 px-4 space-y-1">
+      <nav className="flex-1 py-6 px-3 space-y-1">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
@@ -39,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage })
             <button
               key={item.id}
               onClick={() => setCurrentPage(item.id)}
-              className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
                 isActive
                   ? "text-brand-500 dark:text-white bg-brand-50/50 dark:bg-navy-700/50"
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-navy-700/20"

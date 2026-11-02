@@ -184,7 +184,7 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
   const hasData = periodTransactions.length > 0;
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8">
+    <div className="space-y-4 sm:space-y-5 pb-24 md:pb-8">
       {/* 1. Period Selector Tabs */}
       <Card variant="default" className="p-3.5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -327,7 +327,7 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
           </div>
 
           {/* 3. Category Breakdown Pie/Donut charts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
             <CategoryDonutChart
               data={expenseBreakdown}
               title={t.statistics.whereMoneyWent}

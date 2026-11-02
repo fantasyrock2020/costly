@@ -265,7 +265,7 @@ function App() {
       <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
 
       {/* Main View Shell */}
-      <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 md:ml-60 flex flex-col min-h-screen">
         {/* Header */}
         <Header
           selectedYear={selectedYear}
@@ -280,7 +280,7 @@ function App() {
         />
 
         {/* Scrollable content container */}
-        <main className="flex-1 px-4 md:px-8 py-6 max-w-5xl w-full mx-auto">
+        <main className="app-content flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 w-full mx-auto">
           {currentPage === "dashboard" && (
             <Dashboard
               transactions={transactions}
@@ -326,10 +326,10 @@ function App() {
         <BottomNav currentPage={currentPage} setCurrentPage={setCurrentPage} />
 
         {/* Mobile Floating Action Button (+) */}
-        <div className="md:hidden fixed bottom-20 right-5 z-30">
+        <div className="mobile-fab md:hidden fixed right-5 z-30">
           <button
             onClick={() => handleOpenAddModal(null)}
-            className="w-14 h-14 bg-brand-500 hover:bg-brand-600 dark:bg-brand-dark-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-brand-500/25 active:scale-95 transition-all outline-none"
+            className="w-12 h-12 bg-brand-500 hover:bg-brand-600 dark:bg-brand-dark-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-brand-500/25 active:scale-95 transition-all outline-none"
             aria-label="Thêm giao dịch"
           >
             <Plus className="w-7 h-7" />

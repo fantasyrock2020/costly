@@ -26,10 +26,83 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    background: #f7f8fc;
+  }
+
+  :root.dark {
+    color-scheme: dark;
+    background: #080f26;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    min-width: 320px;
+    min-height: 100%;
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background: #f7f8fc;
+    color: #172033;
+  }
+
+  .dark body {
+    background: #080f26;
+    color: #f8fafc;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: 2px solid #4318ff;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgb(67 24 255 / 18%);
+  }
+}
+
+@layer components {
+  .app-content {
+    max-width: 1440px;
+  }
+
+  .mobile-fab {
+    bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  input:not([type="checkbox"]):focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    border-color: #4318ff;
+    box-shadow: 0 0 0 3px rgb(67 24 255 / 12%);
   }
 }
 
@@ -54,5 +127,31 @@
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .horizon-card-hover:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 767px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .horizon-card-hover:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

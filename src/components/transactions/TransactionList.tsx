@@ -54,7 +54,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {groupedTransactions.map((group) => {
         const dayIncome = group.items
           .filter((tx) => tx.type === "income")
@@ -84,7 +84,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             </div>
 
           {/* Group Items */}
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {group.items.map((tx) => {
               const isIncome = tx.type === "income";
               
@@ -100,18 +100,19 @@ export const TransactionList: React.FC<TransactionListProps> = ({
               }) : "09:00";
 
               return (
-                <div
+                <button
                   key={tx.id}
+                  type="button"
                   onClick={() => onEditTransaction(tx)}
-                  className="flex items-center justify-between p-4 bg-white hover:bg-slate-50/50 dark:bg-navy-800 dark:hover:bg-navy-700/40 rounded-2xl border border-slate-100/50 dark:border-navy-700/50 shadow-[0_4px_12px_rgba(0,0,0,0.01)] hover:shadow-md cursor-pointer transition-all duration-200"
+                  className="w-full text-left flex items-center justify-between gap-2 p-3 sm:p-3.5 bg-white hover:bg-slate-50/50 dark:bg-navy-800 dark:hover:bg-navy-700/40 rounded-xl border border-slate-200/60 dark:border-navy-700/70 shadow-sm hover:shadow-md cursor-pointer transition-all duration-200"
                 >
                   {/* Left info */}
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-navy-700 flex items-center justify-center text-2xl shrink-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-navy-700 flex items-center justify-center text-xl shrink-0">
                       {emoji}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate">
+                      <h4 className="text-sm font-semibold text-slate-800 dark:text-white truncate">
                         {tx.note || categoryName}
                       </h4>
                       <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-1 text-slate-400 dark:text-slate-500">
@@ -133,16 +134,16 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                   </div>
 
                   {/* Right info (Amount) */}
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 max-w-[42%]">
                     <span
-                      className={`text-base font-extrabold ${
+                      className={`text-xs sm:text-sm font-bold whitespace-nowrap ${
                         isIncome ? "text-income" : "text-expense"
                       }`}
                     >
                       {isIncome ? "+" : "-"} {formatCurrency(tx.amount)}
                     </span>
                   </div>
-                </div>
+                </button>
               );
             })}
             </div>

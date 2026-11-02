@@ -81,11 +81,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const hasAnyTransactions = transactions.length > 0;
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8">
+    <div className="space-y-4 sm:space-y-5 pb-24 md:pb-8">
       {/* If database is completely empty, show onboarding/empty state */}
       {!hasAnyTransactions ? (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8 bg-white dark:bg-navy-800 rounded-3xl border border-slate-100 dark:border-navy-700/50 shadow-sm space-y-6">
-          <div className="w-20 h-20 bg-brand-50 dark:bg-navy-700 rounded-full flex items-center justify-center text-4xl animate-bounce">
+        <div className="flex flex-col items-center justify-center min-h-[48vh] text-center p-6 sm:p-8 bg-white dark:bg-navy-800 rounded-2xl border border-slate-200/70 dark:border-navy-700/70 shadow-sm space-y-5">
+        <div className="w-16 h-16 bg-brand-50 dark:bg-navy-700 rounded-2xl flex items-center justify-center text-3xl">
             💵
           </div>
           <div className="space-y-2">
@@ -123,7 +123,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           />
 
           {/* Main Content Grid: Chart & Recent */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
             {/* Chart - Spans 2 columns on large screens */}
             <div className="lg:col-span-2">
               <CashFlowChart

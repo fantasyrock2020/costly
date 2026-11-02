@@ -53,39 +53,41 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-6 px-4 md:px-8 bg-slate-50/50 dark:bg-navy-900/50 sticky top-0 backdrop-blur-md z-10 border-b border-slate-100/30 dark:border-navy-800/30">
+    <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 py-3.5 sm:py-4 px-4 sm:px-6 lg:px-8 bg-slate-50/95 dark:bg-navy-900/95 sticky top-0 backdrop-blur-md z-10 border-b border-slate-200/70 dark:border-navy-800">
       {/* Page Title & Greeting */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight m-0 mb-1 leading-tight">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white tracking-tight m-0 mb-0.5 leading-tight">
           {title}
         </h1>
-        <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
+        <p className="text-xs sm:text-sm font-medium text-slate-400 dark:text-slate-500">
           {greeting}
         </p>
       </div>
 
       {/* Center Month Selector & Theme Toggle */}
-      <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
-        <SyncStatusBadge onOpenSettings={onNavigateToSettings} />
-        {onOpenAuthModal && <UserProfileMenu onOpenAuthModal={onOpenAuthModal} />}
+      <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2">
+          <SyncStatusBadge onOpenSettings={onNavigateToSettings} />
+          {onOpenAuthModal && <UserProfileMenu onOpenAuthModal={onOpenAuthModal} />}
+        </div>
 
         {/* Month Selector Card */}
-        <div className="flex items-center gap-1.5 bg-white dark:bg-navy-800 border border-slate-100 dark:border-navy-700/80 px-2 py-1.5 rounded-2xl shadow-sm">
+        <div className="flex items-center gap-1 bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 px-1.5 py-1 rounded-xl shadow-sm">
           <button
             onClick={handlePrevMonth}
-            className="p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-navy-700 text-slate-500 dark:text-slate-400 transition-colors h-[36px] w-[36px] flex items-center justify-center"
+            className="p-1 rounded-lg hover:bg-slate-50 dark:hover:bg-navy-700 text-slate-500 dark:text-slate-400 transition-colors h-9 w-9 flex items-center justify-center"
             aria-label="Tháng trước"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           
-          <span className="text-sm font-semibold text-slate-700 dark:text-white px-2 min-w-[120px] text-center">
+          <span className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-white px-1 sm:px-2 min-w-[104px] sm:min-w-[120px] text-center">
             {formatMonthYear(selectedYear, selectedMonth)}
           </span>
           
           <button
             onClick={handleNextMonth}
-            className="p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-navy-700 text-slate-500 dark:text-slate-400 transition-colors h-[36px] w-[36px] flex items-center justify-center"
+            className="p-1 rounded-lg hover:bg-slate-50 dark:hover:bg-navy-700 text-slate-500 dark:text-slate-400 transition-colors h-9 w-9 flex items-center justify-center"
             aria-label="Tháng sau"
           >
             <ChevronRight className="w-5 h-5" />

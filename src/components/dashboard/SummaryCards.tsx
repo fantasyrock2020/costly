@@ -30,7 +30,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
   const balanceChange = calculateChange(currentBalance, prevBalance);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
       {/* 1. BALANCE CARD (Most Prominent - Horizon UI Brand Style) */}
       <Card variant="brand" className="relative overflow-hidden horizon-card-hover group">
         <div className="absolute -right-4 -bottom-6 text-white/10 group-hover:scale-110 transition-transform duration-300">
@@ -47,8 +47,8 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
             </span>
           </div>
 
-          <div className="my-5">
-            <h3 className="text-2xl sm:text-3xl font-black tracking-tight select-all">
+          <div className="my-3 sm:my-4">
+            <h3 className="text-2xl sm:text-2xl lg:text-3xl font-black tracking-tight select-all break-words">
               {formatCurrency(currentBalance)}
             </h3>
           </div>
@@ -77,38 +77,38 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
       </Card>
 
       {/* 2. INCOME CARD */}
-      <Card variant="default" className="flex items-center justify-between border-l-4 border-l-income horizon-card-hover">
-        <div className="space-y-2">
+      <Card variant="default" className="flex items-center justify-between gap-2 border-l-4 border-l-income horizon-card-hover">
+        <div className="space-y-1.5 min-w-0">
           <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
             {t.dashboard.income}
           </span>
-          <h3 className="text-2xl font-black text-slate-800 dark:text-white select-all">
+          <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white select-all break-words">
             {formatCurrency(currentIncome)}
           </h3>
           <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1">
             <span className="text-income">↑</span> Ghi nhận tháng này
           </span>
         </div>
-        <div className="p-3.5 rounded-2xl bg-income/10 text-income dark:bg-income/20">
-          <ArrowUpRight className="w-6 h-6" />
+        <div className="p-2.5 rounded-xl bg-income/10 text-income dark:bg-income/20 shrink-0">
+          <ArrowUpRight className="w-5 h-5" />
         </div>
       </Card>
 
       {/* 3. EXPENSE CARD */}
-      <Card variant="default" className="flex items-center justify-between border-l-4 border-l-expense horizon-card-hover">
-        <div className="space-y-2">
+      <Card variant="default" className="flex items-center justify-between gap-2 border-l-4 border-l-expense horizon-card-hover">
+        <div className="space-y-1.5 min-w-0">
           <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
             {t.dashboard.expense}
           </span>
-          <h3 className="text-2xl font-black text-slate-800 dark:text-white select-all">
+          <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white select-all break-words">
             {formatCurrency(currentExpense)}
           </h3>
           <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1">
             <span className="text-expense">↓</span> Đã chi tiêu tháng này
           </span>
         </div>
-        <div className="p-3.5 rounded-2xl bg-expense/10 text-expense dark:bg-expense/20">
-          <ArrowDownLeft className="w-6 h-6" />
+        <div className="p-2.5 rounded-xl bg-expense/10 text-expense dark:bg-expense/20 shrink-0">
+          <ArrowDownLeft className="w-5 h-5" />
         </div>
       </Card>
     </div>

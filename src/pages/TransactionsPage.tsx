@@ -127,7 +127,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   }, [filteredTransactions]);
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8">
+    <div className="space-y-4 sm:space-y-5 pb-24 md:pb-8">
       {/* Top filter section */}
       <Card variant="default" className="space-y-4">
         {/* Search & Add Button */}

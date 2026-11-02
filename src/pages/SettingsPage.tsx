@@ -159,7 +159,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const incomeCategories = useMemo(() => categories.filter(c => c.type === "income"), [categories]);
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8">
+    <div className="space-y-4 sm:space-y-5 pb-24 md:pb-8">
       {/* 1. Categories Management */}
       <Card variant="default" className="space-y-6">
         <div>
