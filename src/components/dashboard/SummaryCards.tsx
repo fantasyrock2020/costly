@@ -33,11 +33,11 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
       {/* 1. BALANCE CARD (Most Prominent - Horizon UI Brand Style) */}
       <Card variant="brand" className="relative overflow-hidden horizon-card-hover group">
-        <div className="absolute -right-4 -bottom-6 text-white/10 group-hover:scale-110 transition-transform duration-300">
+        <div className="absolute -right-4 -bottom-6 text-white/10 group-hover:scale-110 transition-transform duration-300 pointer-events-none">
           <Wallet className="w-36 h-36" />
         </div>
         
-        <div className="relative z-10 flex flex-col h-full justify-between">
+        <div className="relative z-1 flex flex-col h-full justify-between">
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold opacity-80 uppercase tracking-wider">
               {t.dashboard.balance}

@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 py-3.5 sm:py-4 px-4 sm:px-6 lg:px-8 bg-slate-50/95 dark:bg-navy-900/95 sticky top-0 backdrop-blur-md z-10 border-b border-slate-200/70 dark:border-navy-800">
+    <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 py-3.5 sm:py-4 px-4 sm:px-6 lg:px-8 bg-slate-50/95 dark:bg-navy-900/95 sticky top-0 backdrop-blur-md z-20 border-b border-slate-200/70 dark:border-navy-800">
       {/* Page Title & Greeting */}
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white tracking-tight m-0 mb-0.5 leading-tight">
