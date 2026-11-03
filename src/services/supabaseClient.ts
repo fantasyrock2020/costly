@@ -9,8 +9,15 @@ export interface SupabaseConfig {
 
 let cachedClient: SupabaseClient | null = null;
 let cachedConfigKey = "";
+const configListeners = new Set<() => void>();
 
 export const supabaseClientService = {
+  // Subscribe to config updates
+  onConfigChange(listener: () => void): () => void {
+    configListeners.add(listener);
+    return () => configListeners.delete(listener);
+  },
+
   // Get stored or env config
   getConfig(): SupabaseConfig {
     try {
@@ -28,11 +35,11 @@ export const supabaseClientService = {
       console.error("Error reading supabase config:", e);
     }
 
-    // Fallback to Vite env variables
+    // Fallback to Vite env variables (prefer standard JWT anon key)
     const envUrl = (import.meta.env.VITE_SUPABASE_URL || "").trim();
     const envAnonKey = (
-      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
       import.meta.env.VITE_SUPABASE_ANON_KEY ||
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
       ""
     ).trim();
 
@@ -54,6 +61,13 @@ export const supabaseClientService = {
     // Invalidate client
     cachedClient = null;
     cachedConfigKey = "";
+    configListeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error("Error in config change listener:", err);
+      }
+    });
   },
 
   // Clear config
@@ -61,6 +75,13 @@ export const supabaseClientService = {
     localStorage.removeItem(SUPABASE_CONFIG_KEY);
     cachedClient = null;
     cachedConfigKey = "";
+    configListeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error("Error in config change listener:", err);
+      }
+    });
   },
 
   // Check if configured
@@ -85,7 +106,10 @@ export const supabaseClientService = {
       cachedClient = createClient(config.url, config.anonKey, {
         auth: {
           persistSession: true,
-          autoRefreshToken: true
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          flowType: "pkce",
+          storage: typeof window !== "undefined" ? window.localStorage : undefined
         }
       });
       cachedConfigKey = currentKey;
