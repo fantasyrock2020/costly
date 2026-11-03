@@ -231,12 +231,9 @@ export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onDa
               <Cloud className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider">
-              Đồng bộ Supabase Cloud & Offline
+              Đồng bộ dữ liệu
             </h3>
           </div>
-          <p className="text-xs text-slate-400 dark:text-slate-500 font-medium mt-1">
-            Lưu trữ dữ liệu trên Supabase kết hợp LocalStorage: hoạt động offline mượt mà và tự động sync khi có mạng.
-          </p>
         </div>
 
         {/* Live Status indicator */}
@@ -263,29 +260,6 @@ export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onDa
       {/* Sync Status Banner */}
       <div className="bg-slate-50 dark:bg-navy-900/90 rounded-2xl p-4 border border-slate-100 dark:border-navy-800 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="bg-white dark:bg-navy-800 p-3 rounded-xl border border-slate-100 dark:border-navy-700">
-            <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-              Trạng thái mạng
-            </span>
-            <div className="flex items-center gap-2">
-              {syncState.isOnline ? (
-                <>
-                  <Globe className="w-4 h-4 text-emerald-500" />
-                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                    Đang online
-                  </span>
-                </>
-              ) : (
-                <>
-                  <CloudOff className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                    Đang offline
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
           <div className="bg-white dark:bg-navy-800 p-3 rounded-xl border border-slate-100 dark:border-navy-700">
             <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
               Hàng đợi chờ Sync
@@ -351,125 +325,8 @@ export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onDa
             />
             <span>Đồng bộ ngay</span>
           </Button>
-
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleUploadAll}
-            disabled={isActionLoading || !isConfigured}
-            className="flex items-center gap-2 py-2 px-3 text-xs font-bold"
-            title="Đẩy tất cả dữ liệu từ máy lên Supabase"
-          >
-            <UploadCloud className="w-3.5 h-3.5" />
-            <span>Đẩy dữ liệu lên Cloud</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handlePullAll}
-            disabled={isActionLoading || !isConfigured}
-            className="flex items-center gap-2 py-2 px-3 text-xs font-bold"
-            title="Tải tất cả dữ liệu từ Supabase về máy này"
-          >
-            <DownloadCloud className="w-3.5 h-3.5" />
-            <span>Tải dữ liệu từ Cloud</span>
-          </Button>
         </div>
       </div>
-
-      {/* Configuration Form */}
-      <form onSubmit={handleSaveConfig} className="space-y-4">
-        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 uppercase tracking-wide">
-          <Key className="w-4 h-4 text-brand-500" />
-          Thông tin cấu hình Supabase
-        </h4>
-
-        {saveSuccess && (
-          <div className="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 p-2.5 rounded-xl font-bold flex items-center gap-2 border border-emerald-200">
-            <Check className="w-4 h-4" />
-            Đã lưu cấu hình Supabase thành công!
-          </div>
-        )}
-
-        {testResult && (
-          <div
-            className={`text-xs p-3 rounded-xl font-bold flex items-center gap-2 border ${
-              testResult.success
-                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200"
-                : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200"
-            }`}
-          >
-            {testResult.success ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
-            ) : (
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-            )}
-            <span>{testResult.message}</span>
-          </div>
-        )}
-
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-              Supabase Project URL
-            </label>
-            <input
-              type="text"
-              placeholder="https://xyzcompany.supabase.co"
-              value={config.url}
-              onChange={(e) => setConfig({ ...config, url: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-200 dark:border-navy-700 rounded-xl bg-white dark:bg-navy-800 text-slate-800 dark:text-white outline-none focus:border-brand-500 transition-colors"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-              Supabase Anon Public Key
-            </label>
-            <input
-              type="password"
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              value={config.anonKey}
-              onChange={(e) => setConfig({ ...config, anonKey: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs font-mono font-medium border border-slate-200 dark:border-navy-700 rounded-xl bg-white dark:bg-navy-800 text-slate-800 dark:text-white outline-none focus:border-brand-500 transition-colors"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button
-            type="submit"
-            variant="primary"
-            className="text-xs font-bold py-2 px-5 flex items-center gap-1.5"
-          >
-            <Check className="w-4 h-4" />
-            <span>Lưu cấu hình</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleTestConnection}
-            disabled={isTesting || !config.url || !config.anonKey}
-            className="text-xs font-bold py-2 px-4 flex items-center gap-1.5"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? "animate-spin" : ""}`} />
-            <span>Kiểm tra kết nối</span>
-          </Button>
-
-          {isConfigured && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleClearConfig}
-              className="text-xs font-semibold py-2 px-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-            >
-              <span>Ngắt kết nối</span>
-            </Button>
-          )}
-        </div>
-      </form>
 
       {/* SQL Setup Guide Accordion */}
       <div className="border border-slate-100 dark:border-navy-800 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-navy-900/50">
