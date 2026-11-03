@@ -72,10 +72,7 @@ function App() {
   useEffect(() => {
     loadAllData();
 
-    // Trigger initial background sync
-    syncService.sync();
-
-    // Listen to background sync data changes (e.g. pulled from cloud)
+    // Listen to background sync data changes (e.g. pulled from cloud when user clicks sync)
     const unsubscribeSync = syncService.onDataUpdate(() => {
       loadAllData();
     });

@@ -33,7 +33,6 @@ class SyncService {
   private listeners: Set<SyncStateListener> = new Set();
   private dataUpdateListeners: Set<DataUpdateListener> = new Set();
   private isSyncing = false;
-  private syncTimeout: any = null;
 
   private state: SyncState = {
     status: "idle",
@@ -70,25 +69,11 @@ class SyncService {
     // Network status listeners
     window.addEventListener("online", () => {
       this.updateState({ isOnline: true });
-      // When back online, automatically trigger sync!
-      this.triggerSyncDebounced(1000);
     });
 
     window.addEventListener("offline", () => {
       this.updateState({ isOnline: false, status: "offline" });
     });
-
-    // Auto-sync periodic heartbeat when online (every 60s)
-    setInterval(() => {
-      if (
-        this.state.isOnline &&
-        supabaseClientService.isConfigured() &&
-        !this.isSyncing &&
-        this.state.status !== "error"
-      ) {
-        this.sync();
-      }
-    }, 60000);
   }
 
   // Subscribe to sync state changes
@@ -199,23 +184,123 @@ class SyncService {
 
     this.saveQueue(queue);
 
-    // If online and Supabase is configured, trigger sync
-    if (this.state.isOnline && supabaseClientService.isConfigured()) {
-      this.triggerSyncDebounced(1500);
-    } else if (!this.state.isOnline) {
-      this.updateState({ status: "offline" });
-    } else if (!supabaseClientService.isConfigured()) {
-      this.updateState({ status: "unconfigured" });
-    }
+    this.updateState({
+      pendingCount: queue.length,
+      status: !this.state.isOnline
+        ? "offline"
+        : !supabaseClientService.isConfigured()
+        ? "unconfigured"
+        : queue.length > 0
+        ? "idle"
+        : "synced"
+    });
   }
 
-  public triggerSyncDebounced(ms: number = 1000) {
-    if (this.syncTimeout) {
-      clearTimeout(this.syncTimeout);
+  /**
+   * Directly execute mutation against Supabase for logged-in users.
+   * If offline or request fails, falls back to enqueueing for manual sync when the user clicks 'Đồng bộ'.
+   */
+  public async pushMutationDirectly(
+    item: Omit<SyncQueueItem, "id" | "timestamp" | "attempts">
+  ): Promise<boolean> {
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser || currentUser.isGuest) {
+      return false;
     }
-    this.syncTimeout = setTimeout(() => {
-      this.sync();
-    }, ms);
+
+    const client = supabaseClientService.getClient();
+    if (!client || !navigator.onLine) {
+      this.enqueue(item);
+      return false;
+    }
+
+    try {
+      const userId = item.userId || item.payload?.userId || currentUser.id;
+
+      if (item.entity === "transaction") {
+        if (item.action === "upsert" && item.payload) {
+          const tx: Transaction = item.payload;
+          const row: any = {
+            id: tx.id,
+            user_id: userId,
+            type: tx.type,
+            amount: tx.amount,
+            category: tx.category,
+            date: tx.date,
+            location: tx.location || null,
+            note: tx.note || null,
+            created_at: tx.createdAt || new Date().toISOString(),
+            updated_at: tx.updatedAt || new Date().toISOString(),
+            deleted_at: null
+          };
+          const { error } = await client.from("transactions").upsert(row);
+          if (error) throw error;
+        } else if (item.action === "delete") {
+          const { error } = await client
+            .from("transactions")
+            .update({ deleted_at: new Date().toISOString() })
+            .eq("id", item.recordId);
+          if (error) {
+            await client.from("transactions").delete().eq("id", item.recordId);
+          }
+        }
+      } else if (item.entity === "category") {
+        if (item.action === "upsert" && item.payload) {
+          const cat: Category = item.payload;
+          const row: any = {
+            id: cat.id,
+            user_id: userId,
+            name: cat.name,
+            icon: cat.icon,
+            type: cat.type,
+            is_custom: !!cat.isCustom,
+            updated_at: new Date().toISOString(),
+            deleted_at: null
+          };
+          const { error } = await client.from("categories").upsert(row);
+          if (error) throw error;
+        } else if (item.action === "delete") {
+          const { error } = await client
+            .from("categories")
+            .update({ deleted_at: new Date().toISOString() })
+            .eq("id", item.recordId);
+          if (error) {
+            await client.from("categories").delete().eq("id", item.recordId);
+          }
+        }
+      } else if (item.entity === "summary") {
+        if (item.action === "upsert" && item.payload) {
+          const sum: YearSummary = item.payload;
+          const row: any = {
+            id: `${userId}_${sum.year}`,
+            user_id: userId,
+            year: sum.year,
+            total_income: sum.totalIncome,
+            total_expense: sum.totalExpense,
+            balance: sum.balance,
+            transaction_count: sum.transactionCount,
+            top_expense_categories: sum.topExpenseCategories,
+            top_income_categories: sum.topIncomeCategories,
+            updated_at: new Date().toISOString()
+          };
+          const { error } = await client.from("yearly_summaries").upsert(row);
+          if (error) throw error;
+        }
+      }
+
+      const nowISO = new Date().toISOString();
+      localStorage.setItem(LAST_SYNCED_KEY, nowISO);
+      this.updateState({
+        lastSyncedAt: nowISO,
+        pendingCount: this.getQueue().length,
+        status: "synced"
+      });
+      return true;
+    } catch (err) {
+      console.warn("Direct push to Supabase failed, queued for manual sync:", err);
+      this.enqueue(item);
+      return false;
+    }
   }
 
   // Main Sync Function (Two-way sync: Push local changes, Pull remote changes)

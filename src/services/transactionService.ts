@@ -180,14 +180,16 @@ export const transactionService = {
     if (success) {
       const currentUser = authService.getCurrentUser();
       if (currentUser?.isGuest) saveGuestSnapshot(readLocalDataSnapshot(), currentUser.id);
-      categoriesToSave.filter(c => c.isCustom).forEach(cat => {
-        syncService.enqueue({
-          entity: "category",
-          action: "upsert",
-          recordId: cat.id,
-          payload: cat
+      if (currentUser && !currentUser.isGuest) {
+        categoriesToSave.filter(c => c.isCustom).forEach(cat => {
+          void syncService.pushMutationDirectly({
+            entity: "category",
+            action: "upsert",
+            recordId: cat.id,
+            payload: cat
+          });
         });
-      });
+      }
     }
     return success;
   },
@@ -207,14 +209,16 @@ export const transactionService = {
     if (success) {
       const currentUser = authService.getCurrentUser();
       if (currentUser?.isGuest) saveGuestSnapshot(readLocalDataSnapshot(), currentUser.id);
-      summariesToSave.forEach(sum => {
-        syncService.enqueue({
-          entity: "summary",
-          action: "upsert",
-          recordId: String(sum.year),
-          payload: sum
+      if (currentUser && !currentUser.isGuest) {
+        summariesToSave.forEach(sum => {
+          void syncService.pushMutationDirectly({
+            entity: "summary",
+            action: "upsert",
+            recordId: String(sum.year),
+            payload: sum
+          });
         });
-      });
+      }
     }
     return success;
   },
@@ -347,12 +351,14 @@ export const transactionService = {
 
     const result = this.saveTransactions(transactions);
     if (result.success) {
-      syncService.enqueue({
-        entity: "transaction",
-        action: "upsert",
-        recordId: txToSave.id,
-        payload: txToSave
-      });
+      if (currentUser && !currentUser.isGuest) {
+        void syncService.pushMutationDirectly({
+          entity: "transaction",
+          action: "upsert",
+          recordId: txToSave.id,
+          payload: txToSave
+        });
+      }
     }
     
     return result;
@@ -458,12 +464,15 @@ export const transactionService = {
     const filtered = transactions.filter(t => t.id !== id);
     const result = this.saveTransactions(filtered);
     if (result.success) {
-      syncService.enqueue({
-        entity: "transaction",
-        action: "delete",
-        recordId: id,
-        userId: deletedTransaction?.userId
-      });
+      const currentUser = authService.getCurrentUser();
+      if (currentUser && !currentUser.isGuest) {
+        void syncService.pushMutationDirectly({
+          entity: "transaction",
+          action: "delete",
+          recordId: id,
+          userId: deletedTransaction?.userId
+        });
+      }
     }
     return result;
   },

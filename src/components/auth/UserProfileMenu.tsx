@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { LogIn, LogOut, ChevronDown, ShieldCheck } from "lucide-react";
 import { authService } from "../../services/authService";
-import { syncService } from "../../services/syncService";
 import type { AuthUser } from "../../types";
 
 interface UserProfileMenuProps {
@@ -35,7 +34,6 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({ onOpenAuthModa
   const handleSignOut = async () => {
     setIsOpen(false);
     await authService.signOut();
-    syncService.sync();
   };
 
   if (!user || user.isGuest) {

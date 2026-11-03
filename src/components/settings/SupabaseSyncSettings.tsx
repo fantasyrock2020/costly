@@ -1,28 +1,23 @@
 import React, { useState, useEffect } from "react";
 import {
   Cloud,
-  CloudOff,
   RefreshCw,
   Check,
   Copy,
   ExternalLink,
   Database,
-  UploadCloud,
-  DownloadCloud,
-  Key,
-  Globe,
   ChevronDown,
   ChevronUp,
   AlertCircle,
   CheckCircle2
 } from "lucide-react";
-import { supabaseClientService, type SupabaseConfig } from "../../services/supabaseClient";
+import { supabaseClientService } from "../../services/supabaseClient";
 import { syncService, type SyncState } from "../../services/syncService";
 import { Card } from "../ui/Card";
 import Button from "../ui/Button";
 
 interface SupabaseSyncSettingsProps {
-  onDataReset: () => void;
+  onDataReset?: () => void;
 }
 
 const SQL_SCHEMA = `-- 1. BẢNG TRANSACTIONS (Giao dịch thu / chi gắn với Supabase Auth user)
@@ -118,13 +113,7 @@ CREATE POLICY "User delete own yearly_summaries" ON public.yearly_summaries
     FOR DELETE TO authenticated USING (auth.uid() = user_id);`;
 
 export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onDataReset }) => {
-  const [config, setConfig] = useState<SupabaseConfig>(supabaseClientService.getConfig());
   const [syncState, setSyncState] = useState<SyncState>(syncService.getState());
-
-  // Testing & Action status states
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ success: boolean; text: string } | null>(null);
 
@@ -139,32 +128,6 @@ export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onDa
     return unsubscribe;
   }, []);
 
-  const handleSaveConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    supabaseClientService.saveConfig(config);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-    // Trigger sync if online
-    syncService.sync();
-  };
-
-  const handleClearConfig = () => {
-    if (window.confirm("Bạn có chắc chắn muốn ngắt kết nối Supabase? Dữ liệu trên máy sẽ không bị mất.")) {
-      supabaseClientService.clearConfig();
-      setConfig({ url: "", anonKey: "" });
-      setTestResult(null);
-      syncService.sync();
-    }
-  };
-
-  const handleTestConnection = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    const result = await supabaseClientService.testConnection(config);
-    setIsTesting(false);
-    setTestResult(result);
-  };
-
   const handleSyncNow = async () => {
     setIsActionLoading(true);
     setActionMessage(null);
@@ -174,42 +137,8 @@ export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onDa
       success: res.success,
       text: res.message || (res.success ? "Đồng bộ thành công!" : "Đồng bộ thất bại.")
     });
-  };
-
-  const handleUploadAll = async () => {
-    if (
-      window.confirm(
-        "Thao tác này sẽ tải toàn bộ giao dịch và danh mục hiện có trên máy này lên Supabase Cloud. Tiếp tục?"
-      )
-    ) {
-      setIsActionLoading(true);
-      setActionMessage(null);
-      const res = await syncService.uploadAllLocalData();
-      setIsActionLoading(false);
-      setActionMessage({
-        success: res.success,
-        text: res.message
-      });
-    }
-  };
-
-  const handlePullAll = async () => {
-    if (
-      window.confirm(
-        "Thao tác này sẽ tải toàn bộ dữ liệu từ Supabase Cloud về máy và cập nhật dữ liệu cục bộ. Tiếp tục?"
-      )
-    ) {
-      setIsActionLoading(true);
-      setActionMessage(null);
-      const res = await syncService.pullAllRemoteData();
-      setIsActionLoading(false);
-      setActionMessage({
-        success: res.success,
-        text: res.message
-      });
-      if (res.success) {
-        onDataReset();
-      }
+    if (res.success) {
+      onDataReset?.();
     }
   };
 
